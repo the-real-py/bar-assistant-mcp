@@ -50,7 +50,7 @@ def get_headers(bar_id=None):
     # Use provided bar_id or fall back to config
     active_bar_id = bar_id or CONFIG["bar_id"]
     if active_bar_id:
-        headers["Bar-Assistant-Bar-Id"] = str(active_bar_id)
+        headers["Bar-Assistant-Bar-Id"] = str(int(active_bar_id))
     
     return headers
 
@@ -77,13 +77,10 @@ async def list_resources() -> list[Resource]:
 @app.read_resource()
 async def read_resource(uri: str) -> str:
     """Read bar shelf resources."""
-    if not CONFIG["bar_id"]:
-        return "Error: No bar ID configured. Please set BAR_ASSISTANT_BAR_ID or use list_bars tool to find your bar ID."
-    
     async with httpx.AsyncClient() as client:
         if uri == "bar://shelf/ingredients":
             response = await client.get(
-                f"{CONFIG['api_url']}/bars/{CONFIG['bar_id']}/ingredients",
+                f"{CONFIG['api_url']}/bars/{int(CONFIG['bar_id'])}/ingredients",
                 headers=get_headers()
             )
             response.raise_for_status()
@@ -98,7 +95,7 @@ async def read_resource(uri: str) -> str:
             
         elif uri == "bar://shelf/cocktails":
             response = await client.get(
-                f"{CONFIG['api_url']}/bars/{CONFIG['bar_id']}/cocktails",
+                f"{CONFIG['api_url']}/bars/{int(CONFIG['bar_id'])}/cocktails",
                 headers=get_headers()
             )
             response.raise_for_status()
@@ -168,14 +165,14 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "bar_id": {
+                        "type": "number",
+                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
+                    },
                     "ingredient_ids": {
                         "type": "array",
                         "items": {"type": "number"},
                         "description": "Array of ingredient IDs to add to shelf"
-                    },
-                    "bar_id": {
-                        "type": "number",
-                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
                     }
                 },
                 "required": ["ingredient_ids"]
@@ -187,14 +184,14 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "bar_id": {
+                        "type": "number",
+                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
+                    },
                     "ingredient_ids": {
                         "type": "array",
                         "items": {"type": "number"},
                         "description": "Array of ingredient IDs to remove from shelf"
-                    },
-                    "bar_id": {
-                        "type": "number",
-                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
                     }
                 },
                 "required": ["ingredient_ids"]
@@ -206,13 +203,13 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Ingredient name to search for"
-                    },
                     "bar_id": {
                         "type": "number",
                         "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Ingredient name to search for"
                     }
                 },
                 "required": ["name"]
@@ -237,21 +234,18 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             result = "Available bars:\n\n"
             for bar in data.get('data', []):
                 result += f"**{bar['name']}** (ID: {bar['id']})\n"
-                if bar.get('subtitle'):
-                    result += f"  {bar['subtitle']}\n"
                 result += f"  Slug: {bar['slug']}\n\n"
             
             return [TextContent(type="text", text=result)]
         
-        # Get bar_id from arguments or config
-        bar_id = arguments.get("bar_id") or CONFIG["bar_id"]
-        if not bar_id:
-            return [TextContent(
-                type="text",
-                text="Error: No bar ID provided. Please provide bar_id parameter or set BAR_ASSISTANT_BAR_ID environment variable. Use list_bars to find your bar ID."
-            )]
-        
-        if name == "get_shelf_ingredients":
+        elif name == "get_shelf_ingredients":
+            bar_id = int(arguments.get("bar_id", CONFIG["bar_id"]))
+            if not bar_id:
+                return [TextContent(
+                    type="text",
+                    text="Error: No bar_id provided and BAR_ASSISTANT_BAR_ID is not set. Use list_bars to find your bar ID."
+                )]
+            
             params = {}
             if arguments.get("page"):
                 params["page"] = arguments["page"]
@@ -271,6 +265,13 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             )]
         
         elif name == "get_shelf_cocktails":
+            bar_id = int(arguments.get("bar_id", CONFIG["bar_id"]))
+            if not bar_id:
+                return [TextContent(
+                    type="text",
+                    text="Error: No bar_id provided and BAR_ASSISTANT_BAR_ID is not set. Use list_bars to find your bar ID."
+                )]
+            
             params = {}
             if arguments.get("page"):
                 params["page"] = arguments["page"]
@@ -292,10 +293,17 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             return [TextContent(type="text", text=result)]
         
         elif name == "add_ingredients_to_shelf":
+            bar_id = int(arguments.get("bar_id", CONFIG["bar_id"]))
+            if not bar_id:
+                return [TextContent(
+                    type="text",
+                    text="Error: No bar_id provided and BAR_ASSISTANT_BAR_ID is not set. Use list_bars to find your bar ID."
+                )]
+            
             response = await client.post(
                 f"{CONFIG['api_url']}/bars/{bar_id}/ingredients/batch-store",
                 headers=get_headers(bar_id),
-                json={"ingredients": arguments["ingredient_ids"]}
+                json={"ingredients": [int(i) for i in arguments["ingredient_ids"]]}
             )
             response.raise_for_status()
             
@@ -305,10 +313,17 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             )]
         
         elif name == "remove_ingredients_from_shelf":
+            bar_id = int(arguments.get("bar_id", CONFIG["bar_id"]))
+            if not bar_id:
+                return [TextContent(
+                    type="text",
+                    text="Error: No bar_id provided and BAR_ASSISTANT_BAR_ID is not set. Use list_bars to find your bar ID."
+                )]
+            
             response = await client.post(
                 f"{CONFIG['api_url']}/bars/{bar_id}/ingredients/batch-delete",
                 headers=get_headers(bar_id),
-                json={"ingredients": arguments["ingredient_ids"]}
+                json={"ingredients": [int(i) for i in arguments["ingredient_ids"]]}
             )
             response.raise_for_status()
             
@@ -318,9 +333,12 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             )]
         
         elif name == "search_ingredients":
+            bar_id = arguments.get("bar_id", CONFIG["bar_id"])
+            headers = get_headers(int(bar_id) if bar_id else None)
+            
             response = await client.get(
                 f"{CONFIG['api_url']}/ingredients",
-                headers=get_headers(bar_id),
+                headers=headers,
                 params={"filter[name]": arguments["name"]}
             )
             response.raise_for_status()
