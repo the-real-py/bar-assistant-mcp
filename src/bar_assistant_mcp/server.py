@@ -82,7 +82,7 @@ async def read_resource(uri: str) -> str:
             response = await client.get(
                 f"{CONFIG['api_url']}/ingredients",
                 headers=get_headers(),
-                params={"filter[on_shelf]": "true"}
+                params={"filter[bar_shelf]": "true"}
             )
             response.raise_for_status()
             data = response.json()
@@ -251,7 +251,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                     text="Error: No bar ID provided. Use list_bars to find your bar ID or set BAR_ASSISTANT_BAR_ID."
                 )]
             
-            params = {"filter[on_shelf]": "true"}
+            params = {"filter[bar_shelf]": "true"}
             if arguments.get("page"):
                 params["page"] = arguments["page"]
             
