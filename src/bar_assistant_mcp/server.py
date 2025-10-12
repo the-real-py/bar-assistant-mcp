@@ -80,8 +80,9 @@ async def read_resource(uri: str) -> str:
     async with httpx.AsyncClient() as client:
         if uri == "bar://shelf/ingredients":
             response = await client.get(
-                f"{CONFIG['api_url']}/bars/{int(CONFIG['bar_id'])}/ingredients",
-                headers=get_headers()
+                f"{CONFIG['api_url']}/ingredients",
+                headers=get_headers(),
+                params={"filter[on_shelf]": "true"}
             )
             response.raise_for_status()
             data = response.json()
@@ -94,8 +95,12 @@ async def read_resource(uri: str) -> str:
             return result
             
         elif uri == "bar://shelf/cocktails":
+            bar_id = CONFIG.get("bar_id")
+            if not bar_id:
+                return "# Error: No bar ID configured\n\nPlease set BAR_ASSISTANT_BAR_ID or use list_bars to find your bar ID."
+            
             response = await client.get(
-                f"{CONFIG['api_url']}/bars/{int(CONFIG['bar_id'])}/cocktails",
+                f"{CONFIG['api_url']}/bars/{int(bar_id)}/cocktails",
                 headers=get_headers()
             )
             response.raise_for_status()
@@ -165,14 +170,14 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "bar_id": {
-                        "type": "number",
-                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
-                    },
                     "ingredient_ids": {
                         "type": "array",
                         "items": {"type": "number"},
                         "description": "Array of ingredient IDs to add to shelf"
+                    },
+                    "bar_id": {
+                        "type": "number",
+                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
                     }
                 },
                 "required": ["ingredient_ids"]
@@ -184,14 +189,14 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "bar_id": {
-                        "type": "number",
-                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
-                    },
                     "ingredient_ids": {
                         "type": "array",
                         "items": {"type": "number"},
                         "description": "Array of ingredient IDs to remove from shelf"
+                    },
+                    "bar_id": {
+                        "type": "number",
+                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
                     }
                 },
                 "required": ["ingredient_ids"]
@@ -203,13 +208,13 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "bar_id": {
-                        "type": "number",
-                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
-                    },
                     "name": {
                         "type": "string",
                         "description": "Ingredient name to search for"
+                    },
+                    "bar_id": {
+                        "type": "number",
+                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
                     }
                 },
                 "required": ["name"]
@@ -238,20 +243,20 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             
             return [TextContent(type="text", text=result)]
         
-        elif name == "get_shelf_ingredients":
-            bar_id = int(arguments.get("bar_id", CONFIG["bar_id"]))
+        if name == "get_shelf_ingredients":
+            bar_id = arguments.get("bar_id") or CONFIG["bar_id"]
             if not bar_id:
                 return [TextContent(
                     type="text",
-                    text="Error: No bar_id provided and BAR_ASSISTANT_BAR_ID is not set. Use list_bars to find your bar ID."
+                    text="Error: No bar ID provided. Use list_bars to find your bar ID or set BAR_ASSISTANT_BAR_ID."
                 )]
             
-            params = {}
+            params = {"filter[on_shelf]": "true"}
             if arguments.get("page"):
                 params["page"] = arguments["page"]
             
             response = await client.get(
-                f"{CONFIG['api_url']}/bars/{bar_id}/ingredients",
+                f"{CONFIG['api_url']}/ingredients",
                 headers=get_headers(bar_id),
                 params=params
             )
@@ -265,11 +270,11 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             )]
         
         elif name == "get_shelf_cocktails":
-            bar_id = int(arguments.get("bar_id", CONFIG["bar_id"]))
+            bar_id = arguments.get("bar_id") or CONFIG["bar_id"]
             if not bar_id:
                 return [TextContent(
                     type="text",
-                    text="Error: No bar_id provided and BAR_ASSISTANT_BAR_ID is not set. Use list_bars to find your bar ID."
+                    text="Error: No bar ID provided. Use list_bars to find your bar ID or set BAR_ASSISTANT_BAR_ID."
                 )]
             
             params = {}
@@ -277,7 +282,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                 params["page"] = arguments["page"]
             
             response = await client.get(
-                f"{CONFIG['api_url']}/bars/{bar_id}/cocktails",
+                f"{CONFIG['api_url']}/bars/{int(bar_id)}/cocktails",
                 headers=get_headers(bar_id),
                 params=params
             )
@@ -293,52 +298,55 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             return [TextContent(type="text", text=result)]
         
         elif name == "add_ingredients_to_shelf":
-            bar_id = int(arguments.get("bar_id", CONFIG["bar_id"]))
+            bar_id = arguments.get("bar_id") or CONFIG["bar_id"]
             if not bar_id:
                 return [TextContent(
                     type="text",
-                    text="Error: No bar_id provided and BAR_ASSISTANT_BAR_ID is not set. Use list_bars to find your bar ID."
+                    text="Error: No bar ID provided. Use list_bars to find your bar ID or set BAR_ASSISTANT_BAR_ID."
                 )]
             
+            ingredient_ids = [int(id) for id in arguments["ingredient_ids"]]
+            
             response = await client.post(
-                f"{CONFIG['api_url']}/bars/{bar_id}/ingredients/batch-store",
+                f"{CONFIG['api_url']}/bars/{int(bar_id)}/ingredients/batch-store",
                 headers=get_headers(bar_id),
-                json={"ingredients": [int(i) for i in arguments["ingredient_ids"]]}
+                json={"ingredients": ingredient_ids}
             )
             response.raise_for_status()
             
             return [TextContent(
                 type="text",
-                text=f"Successfully added {len(arguments['ingredient_ids'])} ingredients to your bar shelf!"
+                text=f"Successfully added {len(ingredient_ids)} ingredients to your bar shelf!"
             )]
         
         elif name == "remove_ingredients_from_shelf":
-            bar_id = int(arguments.get("bar_id", CONFIG["bar_id"]))
+            bar_id = arguments.get("bar_id") or CONFIG["bar_id"]
             if not bar_id:
                 return [TextContent(
                     type="text",
-                    text="Error: No bar_id provided and BAR_ASSISTANT_BAR_ID is not set. Use list_bars to find your bar ID."
+                    text="Error: No bar ID provided. Use list_bars to find your bar ID or set BAR_ASSISTANT_BAR_ID."
                 )]
             
+            ingredient_ids = [int(id) for id in arguments["ingredient_ids"]]
+            
             response = await client.post(
-                f"{CONFIG['api_url']}/bars/{bar_id}/ingredients/batch-delete",
+                f"{CONFIG['api_url']}/bars/{int(bar_id)}/ingredients/batch-delete",
                 headers=get_headers(bar_id),
-                json={"ingredients": [int(i) for i in arguments["ingredient_ids"]]}
+                json={"ingredients": ingredient_ids}
             )
             response.raise_for_status()
             
             return [TextContent(
                 type="text",
-                text=f"Successfully removed {len(arguments['ingredient_ids'])} ingredients from your bar shelf!"
+                text=f"Successfully removed {len(ingredient_ids)} ingredients from your bar shelf!"
             )]
         
         elif name == "search_ingredients":
-            bar_id = arguments.get("bar_id", CONFIG["bar_id"])
-            headers = get_headers(int(bar_id) if bar_id else None)
+            bar_id = arguments.get("bar_id") or CONFIG["bar_id"]
             
             response = await client.get(
                 f"{CONFIG['api_url']}/ingredients",
-                headers=headers,
+                headers=get_headers(bar_id),
                 params={"filter[name]": arguments["name"]}
             )
             response.raise_for_status()
