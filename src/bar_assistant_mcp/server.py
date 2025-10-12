@@ -20,7 +20,7 @@ def get_config():
     config = {
         "api_url": os.getenv("BAR_ASSISTANT_API_URL", "http://localhost:8000/api"),
         "token": os.getenv("BAR_ASSISTANT_TOKEN"),
-        "bar_id": os.getenv("BAR_ASSISTANT_BAR_ID"),  # Now optional
+        "bar_id": os.getenv("BAR_ASSISTANT_BAR_ID"),
     }
     
     # Override with command-line arguments if provided
@@ -48,9 +48,9 @@ def get_headers(bar_id=None):
         headers["Authorization"] = f"Bearer {CONFIG['token']}"
     
     # Use provided bar_id or fall back to config
-    effective_bar_id = bar_id or CONFIG["bar_id"]
-    if effective_bar_id:
-        headers["Bar-Assistant-Bar-Id"] = str(effective_bar_id)
+    active_bar_id = bar_id or CONFIG["bar_id"]
+    if active_bar_id:
+        headers["Bar-Assistant-Bar-Id"] = str(active_bar_id)
     
     return headers
 
@@ -78,7 +78,7 @@ async def list_resources() -> list[Resource]:
 async def read_resource(uri: str) -> str:
     """Read bar shelf resources."""
     if not CONFIG["bar_id"]:
-        return "Error: No bar ID configured. Use list_bars tool to find your bar ID."
+        return "Error: No bar ID configured. Please set BAR_ASSISTANT_BAR_ID or use list_bars tool to find your bar ID."
     
     async with httpx.AsyncClient() as client:
         if uri == "bar://shelf/ingredients":
@@ -130,13 +130,13 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_shelf_ingredients",
-            description="Get all ingredients currently on a bar shelf with detailed information",
+            description="Get all ingredients currently on your bar shelf with detailed information",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "bar_id": {
                         "type": "number",
-                        "description": "Bar ID (optional if configured in environment)"
+                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
                     },
                     "page": {
                         "type": "number",
@@ -147,13 +147,13 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_shelf_cocktails",
-            description="Get all cocktails you can make with ingredients on a bar shelf",
+            description="Get all cocktails you can make with ingredients on your bar shelf",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "bar_id": {
                         "type": "number",
-                        "description": "Bar ID (optional if configured in environment)"
+                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
                     },
                     "page": {
                         "type": "number",
@@ -164,18 +164,18 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="add_ingredients_to_shelf",
-            description="Add ingredients to a bar shelf by their IDs",
+            description="Add ingredients to your bar shelf by their IDs",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "bar_id": {
-                        "type": "number",
-                        "description": "Bar ID (optional if configured in environment)"
-                    },
                     "ingredient_ids": {
                         "type": "array",
                         "items": {"type": "number"},
                         "description": "Array of ingredient IDs to add to shelf"
+                    },
+                    "bar_id": {
+                        "type": "number",
+                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
                     }
                 },
                 "required": ["ingredient_ids"]
@@ -183,18 +183,18 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="remove_ingredients_from_shelf",
-            description="Remove ingredients from a bar shelf by their IDs",
+            description="Remove ingredients from your bar shelf by their IDs",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "bar_id": {
-                        "type": "number",
-                        "description": "Bar ID (optional if configured in environment)"
-                    },
                     "ingredient_ids": {
                         "type": "array",
                         "items": {"type": "number"},
                         "description": "Array of ingredient IDs to remove from shelf"
+                    },
+                    "bar_id": {
+                        "type": "number",
+                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
                     }
                 },
                 "required": ["ingredient_ids"]
@@ -206,13 +206,13 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "bar_id": {
-                        "type": "number",
-                        "description": "Bar ID (optional if configured in environment)"
-                    },
                     "name": {
                         "type": "string",
                         "description": "Ingredient name to search for"
+                    },
+                    "bar_id": {
+                        "type": "number",
+                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
                     }
                 },
                 "required": ["name"]
@@ -234,21 +234,21 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             response.raise_for_status()
             data = response.json()
             
-            bars = data.get('data', [])
-            result = f"Found {len(bars)} bar(s):\n\n"
-            for bar in bars:
-                result += f"- **{bar['name']}** (ID: {bar['id']})\n"
-                if bar.get('description'):
-                    result += f"  Description: {bar['description']}\n"
+            result = "Available bars:\n\n"
+            for bar in data.get('data', []):
+                result += f"**{bar['name']}** (ID: {bar['id']})\n"
+                if bar.get('subtitle'):
+                    result += f"  {bar['subtitle']}\n"
+                result += f"  Slug: {bar['slug']}\n\n"
             
             return [TextContent(type="text", text=result)]
         
         # Get bar_id from arguments or config
-        bar_id = arguments.get('bar_id') or CONFIG['bar_id']
-        if not bar_id and name != "list_bars":
+        bar_id = arguments.get("bar_id") or CONFIG["bar_id"]
+        if not bar_id:
             return [TextContent(
                 type="text",
-                text="Error: No bar ID provided. Use list_bars tool to find your bar ID, then provide it as bar_id parameter."
+                text="Error: No bar ID provided. Please provide bar_id parameter or set BAR_ASSISTANT_BAR_ID environment variable. Use list_bars to find your bar ID."
             )]
         
         if name == "get_shelf_ingredients":
