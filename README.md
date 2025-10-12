@@ -4,6 +4,7 @@ An MCP (Model Context Protocol) server for [Bar Assistant](https://barassistant.
 
 ## Features
 
+- 🍹 List all bars you have access to
 - 📋 View ingredients on your bar shelf
 - 🍸 See cocktails you can make with what you have
 - ➕ Add ingredients to your shelf
@@ -17,10 +18,16 @@ An MCP (Model Context Protocol) server for [Bar Assistant](https://barassistant.
 Run directly with uvx:
 
 ```bash
+# With all parameters
 uvx --from git+https://github.com/the-real-py/bar-assistant-mcp bar-assistant-mcp \
   http://localhost:8000/api \
   your_token_here \
   1
+
+# Or with just API URL and token (use list_bars tool to find bar ID)
+uvx --from git+https://github.com/the-real-py/bar-assistant-mcp bar-assistant-mcp \
+  http://localhost:8000/api \
+  your_token_here
 ```
 
 Or set environment variables in `.env` and run:
@@ -43,20 +50,21 @@ Create a `.env` file in your project directory:
 ```bash
 BAR_ASSISTANT_API_URL=http://localhost:8000/api
 BAR_ASSISTANT_TOKEN=your_bearer_token_here
-BAR_ASSISTANT_BAR_ID=1
+# BAR_ASSISTANT_BAR_ID is optional - use list_bars tool to find it
+# BAR_ASSISTANT_BAR_ID=1
 ```
 
 Or pass them as command-line arguments:
 
 ```bash
-bar-assistant-mcp <api_url> <token> <bar_id>
+bar-assistant-mcp <api_url> <token> [bar_id]
 ```
 
 ### Getting Your Credentials
 
 1. **API URL**: Your Bar Assistant instance URL + `/api`
 2. **Token**: Generate a personal access token from your Bar Assistant profile
-3. **Bar ID**: Find your bar ID in the Bar Assistant UI (usually 1 for your first bar)
+3. **Bar ID**: Use the `list_bars` tool to discover your bar IDs (optional parameter)
 
 ## Usage with Claude Desktop
 
@@ -72,8 +80,7 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
         "git+https://github.com/the-real-py/bar-assistant-mcp",
         "bar-assistant-mcp",
         "http://localhost:8000/api",
-        "your_token_here",
-        "1"
+        "your_token_here"
       ]
     }
   }
@@ -94,8 +101,7 @@ Or using environment variables:
       ],
       "env": {
         "BAR_ASSISTANT_API_URL": "http://localhost:8000/api",
-        "BAR_ASSISTANT_TOKEN": "your_token_here",
-        "BAR_ASSISTANT_BAR_ID": "1"
+        "BAR_ASSISTANT_TOKEN": "your_token_here"
       }
     }
   }
@@ -104,20 +110,23 @@ Or using environment variables:
 
 ## Available Tools
 
+### `list_bars`
+List all bars you have access to and their IDs. Use this first if you don't know your bar ID.
+
 ### `get_shelf_ingredients`
-List all ingredients on your bar shelf.
+List all ingredients on a bar shelf. Optionally specify `bar_id`.
 
 ### `get_shelf_cocktails`
-See all cocktails you can make with your current ingredients.
+See all cocktails you can make with ingredients on a bar shelf. Optionally specify `bar_id`.
 
 ### `add_ingredients_to_shelf`
-Add ingredients to your shelf by their IDs.
+Add ingredients to a bar shelf by their IDs. Optionally specify `bar_id`.
 
 ### `remove_ingredients_from_shelf`
-Remove ingredients from your shelf.
+Remove ingredients from a bar shelf. Optionally specify `bar_id`.
 
 ### `search_ingredients`
-Search for ingredients by name to find their IDs.
+Search for ingredients by name to find their IDs. Optionally specify `bar_id`.
 
 ## Resources
 
