@@ -32,3 +32,6 @@ venv/
 *.swp
 *.swo
 *~
+
+ai_prompt.md
+ai_prompt copy.md

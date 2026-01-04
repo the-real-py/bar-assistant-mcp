@@ -12,6 +12,7 @@ An MCP (Model Context Protocol) server for [Bar Assistant](https://barassistant.
 - 🏪 Discover your available bars
 - 🧪 Create new ingredients
 - 🍹 Create new cocktail recipes
+- ✏️ Update existing cocktail recipes
 
 ## Installation
 
@@ -199,6 +200,28 @@ Create a new cocktail recipe. First use `search_ingredients` to find ingredient 
      garnish="Lime wheel, salt rim"
    )
 ```
+
+### `update_cocktail`
+Update an existing cocktail recipe. Use this to modify the name, instructions, ingredients, or other details of a cocktail.
+
+**Parameters:**
+- `id` (required): ID of the cocktail to update
+- `name` (required): Name of the cocktail
+- `instructions` (required): Step-by-step instructions for making the cocktail
+- `ingredients` (required): Array of ingredients with:
+  - `ingredient_id` (required): ID of the ingredient
+  - `amount` (required): Amount of the ingredient
+  - `units` (optional): Units for the amount (e.g., 'ml', 'oz', 'dash')
+  - `optional` (optional): Whether this ingredient is optional
+  - `note` (optional): Additional note for this ingredient
+  - `sort` (optional): Sort order for the ingredient
+- `description` (optional): Description of the cocktail
+- `garnish` (optional): Garnish for the cocktail
+- `source` (optional): Source/origin of the recipe
+- `glass_id` (optional): ID of the glass type to use
+- `method_id` (optional): ID of the mixing method (shaken, stirred, etc.)
+- `tags` (optional): Array of tags for the cocktail
+- `bar_id` (optional): Bar ID context
 
 ## Resources
 
