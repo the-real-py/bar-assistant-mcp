@@ -623,20 +623,20 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                 "ingredients": []
             }
             
-            # Process ingredients array
-            for ing in arguments["ingredients"]:
+            # Process ingredients array with sort order
+            for idx, ing in enumerate(arguments["ingredients"]):
                 ingredient_entry = {
                     "ingredient_id": int(ing["ingredient_id"]),
-                    "amount": float(ing["amount"])
+                    "amount": float(ing["amount"]),
+                    # Default units to 'ml' if not specified - API may require this
+                    "units": ing.get("units", "ml"),
+                    # Default sort order based on position in array
+                    "sort": int(ing["sort"]) if ing.get("sort") is not None else idx + 1
                 }
-                if ing.get("units"):
-                    ingredient_entry["units"] = ing["units"]
                 if ing.get("optional") is not None:
-                    ingredient_entry["optional"] = ing["optional"]
+                    ingredient_entry["optional"] = bool(ing["optional"])
                 if ing.get("note"):
-                    ingredient_entry["note"] = ing["note"]
-                if ing.get("sort") is not None:
-                    ingredient_entry["sort"] = int(ing["sort"])
+                    ingredient_entry["note"] = str(ing["note"])
                 payload["ingredients"].append(ingredient_entry)
             
             # Add optional fields if provided
@@ -658,7 +658,16 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                 headers=get_headers(bar_id),
                 json=payload
             )
-            response.raise_for_status()
+            
+            # Better error handling - capture API error details
+            if response.status_code >= 400:
+                try:
+                    error_data = response.json()
+                    error_msg = f"API Error ({response.status_code}): {error_data}"
+                except:
+                    error_msg = f"API Error ({response.status_code}): {response.text}"
+                return [TextContent(type="text", text=f"Failed to create cocktail.\n\n{error_msg}\n\nPayload sent: {payload}")]
+            
             data = response.json()
             
             cocktail = data.get("data", {})
@@ -684,20 +693,20 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                 "ingredients": []
             }
             
-            # Process ingredients array
-            for ing in arguments["ingredients"]:
+            # Process ingredients array with sort order
+            for idx, ing in enumerate(arguments["ingredients"]):
                 ingredient_entry = {
                     "ingredient_id": int(ing["ingredient_id"]),
-                    "amount": float(ing["amount"])
+                    "amount": float(ing["amount"]),
+                    # Default units to 'ml' if not specified - API may require this
+                    "units": ing.get("units", "ml"),
+                    # Default sort order based on position in array
+                    "sort": int(ing["sort"]) if ing.get("sort") is not None else idx + 1
                 }
-                if ing.get("units"):
-                    ingredient_entry["units"] = ing["units"]
                 if ing.get("optional") is not None:
-                    ingredient_entry["optional"] = ing["optional"]
+                    ingredient_entry["optional"] = bool(ing["optional"])
                 if ing.get("note"):
-                    ingredient_entry["note"] = ing["note"]
-                if ing.get("sort") is not None:
-                    ingredient_entry["sort"] = int(ing["sort"])
+                    ingredient_entry["note"] = str(ing["note"])
                 payload["ingredients"].append(ingredient_entry)
             
             # Add optional fields if provided
@@ -719,7 +728,16 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                 headers=get_headers(bar_id),
                 json=payload
             )
-            response.raise_for_status()
+            
+            # Better error handling - capture API error details
+            if response.status_code >= 400:
+                try:
+                    error_data = response.json()
+                    error_msg = f"API Error ({response.status_code}): {error_data}"
+                except:
+                    error_msg = f"API Error ({response.status_code}): {response.text}"
+                return [TextContent(type="text", text=f"Failed to update cocktail.\n\n{error_msg}\n\nPayload sent: {payload}")]
+            
             data = response.json()
             
             cocktail = data.get("data", {})
