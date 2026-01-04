@@ -10,6 +10,8 @@ An MCP (Model Context Protocol) server for [Bar Assistant](https://barassistant.
 - ➖ Remove ingredients from your shelf
 - 🔍 Search for ingredients by name
 - 🏪 Discover your available bars
+- 🧪 Create new ingredients
+- 🍹 Create new cocktail recipes
 
 ## Installation
 
@@ -146,6 +148,57 @@ Search for ingredients by name to find their IDs.
 **Parameters:**
 - `name` (required): Ingredient name to search for
 - `bar_id` (optional): Bar ID context
+
+### `create_ingredient`
+Create a new ingredient in the bar database. Use this when an ingredient doesn't exist and needs to be created before adding to a cocktail.
+
+**Parameters:**
+- `name` (required): Name of the ingredient
+- `strength` (optional): Alcohol strength/percentage (e.g., 40 for 40% ABV)
+- `description` (optional): Description of the ingredient
+- `origin` (optional): Origin/country of the ingredient
+- `color` (optional): Hex color code (e.g., '#ffffff')
+- `parent_ingredient_id` (optional): Parent ingredient ID for categorization
+- `units` (optional): Default units for this ingredient (e.g., 'ml', 'oz', 'dash')
+- `bar_id` (optional): Bar ID context
+
+### `create_cocktail`
+Create a new cocktail recipe. First use `search_ingredients` to find ingredient IDs, then use `create_ingredient` for any missing ingredients.
+
+**Parameters:**
+- `name` (required): Name of the cocktail
+- `instructions` (required): Step-by-step instructions for making the cocktail
+- `ingredients` (required): Array of ingredients with:
+  - `ingredient_id` (required): ID of the ingredient
+  - `amount` (required): Amount of the ingredient
+  - `units` (optional): Units for the amount (e.g., 'ml', 'oz', 'dash')
+  - `optional` (optional): Whether this ingredient is optional
+  - `note` (optional): Additional note for this ingredient
+  - `sort` (optional): Sort order for the ingredient
+- `description` (optional): Description of the cocktail
+- `garnish` (optional): Garnish for the cocktail
+- `source` (optional): Source/origin of the recipe
+- `glass_id` (optional): ID of the glass type to use
+- `method_id` (optional): ID of the mixing method (shaken, stirred, etc.)
+- `tags` (optional): Array of tags for the cocktail
+- `bar_id` (optional): Bar ID context
+
+**Example - Creating a Margarita:**
+```
+1. search_ingredients(name="tequila") → ID: 45
+2. search_ingredients(name="lime juice") → ID: 89  
+3. search_ingredients(name="triple sec") → ID: 23
+4. create_cocktail(
+     name="Margarita",
+     instructions="1. Add all ingredients to shaker with ice\n2. Shake well\n3. Strain into salt-rimmed glass",
+     ingredients=[
+       {"ingredient_id": 45, "amount": 60, "units": "ml"},
+       {"ingredient_id": 89, "amount": 30, "units": "ml"},
+       {"ingredient_id": 23, "amount": 30, "units": "ml"}
+     ],
+     garnish="Lime wheel, salt rim"
+   )
+```
 
 ## Resources
 
