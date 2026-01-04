@@ -219,6 +219,129 @@ async def list_tools() -> list[Tool]:
                 },
                 "required": ["name"]
             }
+        ),
+        Tool(
+            name="create_ingredient",
+            description="Create a new ingredient in the bar database. Use this when an ingredient doesn't exist and needs to be created before adding to a cocktail.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the ingredient (required)"
+                    },
+                    "strength": {
+                        "type": "number",
+                        "description": "Alcohol strength/percentage (optional, e.g., 40 for 40% ABV)"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Description of the ingredient (optional)"
+                    },
+                    "origin": {
+                        "type": "string",
+                        "description": "Origin/country of the ingredient (optional)"
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": "Hex color code (optional, e.g., '#ffffff')"
+                    },
+                    "parent_ingredient_id": {
+                        "type": "number",
+                        "description": "Parent ingredient ID for categorization (optional)"
+                    },
+                    "units": {
+                        "type": "string",
+                        "description": "Default units for this ingredient (optional, e.g., 'ml', 'oz', 'dash')"
+                    },
+                    "bar_id": {
+                        "type": "number",
+                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
+                    }
+                },
+                "required": ["name"]
+            }
+        ),
+        Tool(
+            name="create_cocktail",
+            description="Create a new cocktail recipe. First use search_ingredients to find ingredient IDs, then use create_ingredient for any missing ingredients.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the cocktail (required)"
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "description": "Step-by-step instructions for making the cocktail (required)"
+                    },
+                    "ingredients": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "ingredient_id": {
+                                    "type": "number",
+                                    "description": "ID of the ingredient (required)"
+                                },
+                                "amount": {
+                                    "type": "number",
+                                    "description": "Amount of the ingredient (required)"
+                                },
+                                "units": {
+                                    "type": "string",
+                                    "description": "Units for the amount (optional, e.g., 'ml', 'oz', 'dash')"
+                                },
+                                "optional": {
+                                    "type": "boolean",
+                                    "description": "Whether this ingredient is optional (optional)"
+                                },
+                                "note": {
+                                    "type": "string",
+                                    "description": "Additional note for this ingredient (optional)"
+                                },
+                                "sort": {
+                                    "type": "number",
+                                    "description": "Sort order for the ingredient (optional)"
+                                }
+                            },
+                            "required": ["ingredient_id", "amount"]
+                        },
+                        "description": "Array of ingredients with their IDs and amounts (required)"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Description of the cocktail (optional)"
+                    },
+                    "garnish": {
+                        "type": "string",
+                        "description": "Garnish for the cocktail (optional)"
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Source/origin of the recipe (optional)"
+                    },
+                    "glass_id": {
+                        "type": "number",
+                        "description": "ID of the glass type to use (optional)"
+                    },
+                    "method_id": {
+                        "type": "number",
+                        "description": "ID of the mixing method - shaken, stirred, etc. (optional)"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Array of tags for the cocktail (optional)"
+                    },
+                    "bar_id": {
+                        "type": "number",
+                        "description": "Bar ID (optional if BAR_ASSISTANT_BAR_ID is set)"
+                    }
+                },
+                "required": ["name", "instructions", "ingredients"]
+            }
         )
     ]
 
@@ -360,6 +483,108 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                 result += f"- **{ing['name']}** (ID: {ing['id']})\n"
                 if ing.get('description'):
                     result += f"  {ing['description'][:100]}...\n"
+            
+            return [TextContent(type="text", text=result)]
+        
+        elif name == "create_ingredient":
+            bar_id = arguments.get("bar_id") or CONFIG["bar_id"]
+            
+            # Build the ingredient payload
+            payload = {
+                "name": arguments["name"]
+            }
+            
+            # Add optional fields if provided
+            if arguments.get("strength") is not None:
+                payload["strength"] = float(arguments["strength"])
+            if arguments.get("description"):
+                payload["description"] = arguments["description"]
+            if arguments.get("origin"):
+                payload["origin"] = arguments["origin"]
+            if arguments.get("color"):
+                payload["color"] = arguments["color"]
+            if arguments.get("parent_ingredient_id") is not None:
+                payload["parent_ingredient_id"] = int(arguments["parent_ingredient_id"])
+            if arguments.get("units"):
+                payload["units"] = arguments["units"]
+            
+            response = await client.post(
+                f"{CONFIG['api_url']}/ingredients",
+                headers=get_headers(bar_id),
+                json=payload
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            ingredient = data.get("data", {})
+            result = f"Successfully created ingredient!\n\n"
+            result += f"**{ingredient.get('name')}** (ID: {ingredient.get('id')})\n"
+            if ingredient.get('strength'):
+                result += f"  Strength: {ingredient.get('strength')}%\n"
+            if ingredient.get('description'):
+                result += f"  Description: {ingredient.get('description')}\n"
+            if ingredient.get('origin'):
+                result += f"  Origin: {ingredient.get('origin')}\n"
+            
+            return [TextContent(type="text", text=result)]
+        
+        elif name == "create_cocktail":
+            bar_id = arguments.get("bar_id") or CONFIG["bar_id"]
+            
+            # Build the cocktail payload
+            payload = {
+                "name": arguments["name"],
+                "instructions": arguments["instructions"],
+                "ingredients": []
+            }
+            
+            # Process ingredients array
+            for ing in arguments["ingredients"]:
+                ingredient_entry = {
+                    "ingredient_id": int(ing["ingredient_id"]),
+                    "amount": float(ing["amount"])
+                }
+                if ing.get("units"):
+                    ingredient_entry["units"] = ing["units"]
+                if ing.get("optional") is not None:
+                    ingredient_entry["optional"] = ing["optional"]
+                if ing.get("note"):
+                    ingredient_entry["note"] = ing["note"]
+                if ing.get("sort") is not None:
+                    ingredient_entry["sort"] = int(ing["sort"])
+                payload["ingredients"].append(ingredient_entry)
+            
+            # Add optional fields if provided
+            if arguments.get("description"):
+                payload["description"] = arguments["description"]
+            if arguments.get("garnish"):
+                payload["garnish"] = arguments["garnish"]
+            if arguments.get("source"):
+                payload["source"] = arguments["source"]
+            if arguments.get("glass_id") is not None:
+                payload["glass_id"] = int(arguments["glass_id"])
+            if arguments.get("method_id") is not None:
+                payload["method_id"] = int(arguments["method_id"])
+            if arguments.get("tags"):
+                payload["tags"] = arguments["tags"]
+            
+            response = await client.post(
+                f"{CONFIG['api_url']}/cocktails",
+                headers=get_headers(bar_id),
+                json=payload
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            cocktail = data.get("data", {})
+            result = f"Successfully created cocktail!\n\n"
+            result += f"**{cocktail.get('name')}** (ID: {cocktail.get('id')})\n"
+            if cocktail.get('description'):
+                result += f"  Description: {cocktail.get('description')}\n"
+            if cocktail.get('garnish'):
+                result += f"  Garnish: {cocktail.get('garnish')}\n"
+            if cocktail.get('instructions'):
+                result += f"\n**Instructions:**\n{cocktail.get('instructions')}\n"
             
             return [TextContent(type="text", text=result)]
     
